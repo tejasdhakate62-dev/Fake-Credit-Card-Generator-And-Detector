@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecurScan AI™ - Card Validator & Generator</title>
+    <!-- Google Fonts for modern aesthetics -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Tesseract.js via CDN for Browser-based OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #070a13;
+            --panel-bg: rgba(15, 23, 42, 0.75);
+            --border-color: #1e293b;
+            --primary: #06b6d4;      /* Cyan */
+            --accent: #d946ef;       /* Magenta */
+            --success: #10b981;      /* Green */
+            --danger: #ef4444;       /* Red */
+            --warning: #f59e0b;      /* Amber */
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+            --card-glow: rgba(6, 182, 212, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(217, 70, 239, 0.08) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+            overflow-x: hidden;
+        }
+
+        /* Top Header */
+        .app-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        .app-header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            filter: drop-shadow(0 2px 8px rgba(6, 182, 212, 0.3));
+        }
+
+        .app-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+            font-weight: 400;
+        }
+
+        /* Main Container Layout */
+        .dashboard-container {
+            width: 100%;
+            max-width: 1100px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 850px) {
+            .dashboard-container {
+                grid-template-columns: 1.1fr 0.9fr;
+            }
+        }
+
+        /* Shared Dashboard Panel styling */
+        .glass-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1.8rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary);
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        .panel-title span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            box-shadow: 0 0 8px var(--primary);
+            display: inline-block;
+        }
+
+        /* Virtual Credit Card Container */
+        .card-showcase {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        /* The Credit Card Object */
+        .credit-card {
+            width: 350px;
+            height: 220px;
+            border-radius: 18px;
+            padding: 1.8rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: white;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+            overflow: hidden;
+        }
+
+        /* Hologram lighting sweep */
+        .credit-card::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: linear-gradient(
+                45deg, 
+                transparent 45%, 
+                rgba(255, 255, 255, 0.05) 48%, 
+                rgba(255, 255, 255, 0.15) 50%, 
+                rgba(255, 255, 255, 0.05) 52%, 
+                transparent 55%
+            );
+            transform: rotate(-15deg);
+            transition: transform 0.5s ease;
+            pointer-events: none;
+        }
+
+        .credit-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px var(--card-glow);
+        }
+
+        /* Dynamic Card Themes depending on network */
+        .theme-visa {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1d4ed8 100%);
+            --card-glow: rgba(29, 78, 216, 0.4);
+        }
+        .theme-mastercard {
+            background: linear-gradient(135deg, #180808 0%, #7f1d1d 50%, #991b1b 100%);
+            --card-glow: rgba(153, 27, 27, 0.4);
+        }
+        .theme-amex {
+            background: linear-gradient(135deg, #022c22 0%, #064e3b 50%, #115e59 100%);
+            --card-glow: rgba(17, 94, 89, 0.4);
+        }
+        .theme-discover {
+            background: linear-gradient(135deg, #1c0d02 0%, #7c2d12 50%, #9a3412 100%);
+            --card-glow: rgba(154, 52, 18, 0.4);
+        }
+        .theme-jcb {
+            background: linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #4c1d95 100%);
+            --card-glow: rgba(76, 29, 149, 0.4);
+        }
+        .theme-diners {
+            background: linear-gradient(135deg, #030712 0%, #374151 50%, #4b5563 100%);
+            --card-glow: rgba(75, 85, 99, 0.4);
+        }
+        .theme-rupay {
+            background: linear-gradient(135deg, #022440 0%, #0c4a6e 50%, #075985 100%);
+            --card-glow: rgba(7, 89, 133, 0.4);
+        }
+
+        /* Card components styling */
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .card-chip {
+            width: 48px;
+            height: 38px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .card-chip::after {
+            content: '';
+            position: absolute;
+            top: 15%; left: 15%; right: 15%; bottom: 15%;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 4px;
+        }
+
+        .card-logo {
+            font-size: 1.3rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-style: italic;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .card-number-display {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.45rem;
+            letter-spacing: 3px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            margin: 1.2rem 0;
+            word-spacing: 8px;
+        }
+
+        .card-bottom {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        .card-bottom-label {
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            font-size: 0.65rem;
+        }
+
+        .card-bottom-val {
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .card-cvv-val {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Video / Camera Panel */
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1.586;
+            background: #030712;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.2rem;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scan-laser-frame {
+            position: absolute;
+            top: 8%;
+            left: 5%;
+            width: 90%;
+            height: 84%;
+            border: 2px dashed rgba(6, 182, 212, 0.4);
+            border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(3, 7, 18, 0.7);
+            pointer-events: none;
+            transition: border-color 0.3s;
+        }
+
+        /* Scanning Neon Laser */
+        .scan-laser-frame::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to right, transparent, var(--primary), transparent);
+            box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+            animation: scanning 2.5s infinite linear;
+            display: none;
+        }
+
+        .scanning .scan-laser-frame::after {
+            display: block;
+        }
+
+        .scanning .scan-laser-frame {
+            border-color: var(--primary);
+            border-style: solid;
+        }
+
+        @keyframes scanning {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        /* Controls & Form elements */
+        .control-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1.2rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 18px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-cyan {
+            background: linear-gradient(135deg, #0891b2 0%, var(--primary) 100%);
+            color: white;
+            box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3);
+        }
+
+        .btn-cyan:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+            background: linear-gradient(135deg, var(--primary) 0%, #22d3ee 100%);
+        }
+
+        .btn-muted {
+            background: #1e293b;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-muted:hover:not(:disabled) {
+            background: #334155;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Custom Input Fields */
+        .custom-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+
+        .custom-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+        }
+
+        /* Select styling */
+        select.custom-input {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 16px;
+            padding-right: 40px;
+            cursor: pointer;
+        }
+
+        /* Console Log & OCR Diagnostic info */
+        .console-logs {
+            background: #030712;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            min-height: 100px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            overflow-y: auto;
+            max-height: 150px;
+        }
+
+        .console-entry {
+            display: flex;
+            gap: 8px;
+        }
+
+        .console-time {
+            color: var(--primary);
+        }
+
+        .console-status-valid { color: var(--success); }
+        .console-status-fake { color: var(--danger); }
+        .console-status-active { color: var(--accent); }
+
+        /* Progress Bar for OCR */
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: #1e293b;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.75rem;
+            display: none;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            transition: width 0.1s ease;
+        }
+
+        /* OCR Frame Preview section */
+        .ocr-preview-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+        }
+
+        .ocr-preview-canvas {
+            width: 110px;
+            aspect-ratio: 1.586;
+            background: #000;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            object-fit: cover;
+        }
+
+        .ocr-preview-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .ocr-preview-desc strong {
+            color: var(--text-main);
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--success);
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        /* 3D Card Container modifications */
+        .card-container {
+            perspective: 1000px;
+            width: 100%;
+            max-width: 350px;
+            aspect-ratio: 1.586;
+            cursor: pointer;
+            position: relative;
+            container-type: inline-size;
+            overflow: visible;
+        }
+
+        .credit-card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            background: none !important; /* Managed by card faces */
+            box-shadow: none !important;
+            border: none !important;      /* REMOVE EXTRA BORDER */
+            padding: 0 !important;         /* REMOVE EXTRA PADDING */
+            overflow: visible;
+        }
+
+        .credit-card:hover {
+            transform: none !important;
+            box-shadow: none !important;  /* REMOVE EXTRA HOVER SHADING */
+        }
+
+        /* Card Face Elements */
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 18px;
+            padding: 8cqw;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            transition: border-color 0.3s;
+        }
+
+        /* Front face stays normal */
+        .card-front {
+            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+        }
+
+        /* Back face details */
+        .card-back {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            transform: rotateY(180deg);
+            padding: 5cqw 0; /* Space for magnetic strip */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: stretch;
+        }
+
+        /* Magnetic Strip */
+        .card-back-strip {
+            height: 18%;
+            background: #030712;
+            width: 100%;
+            margin-top: 2%;
+        }
+
+        /* Signature and CVV */
+        .card-back-signature-container {
+            display: flex;
+            align-items: center;
+            padding: 0 7cqw;
+            gap: 3cqw;
+            margin-top: 3%;
+        }
+
+        .card-back-signature {
+            flex: 1;
+            height: 10cqw;
+            background: repeating-linear-gradient(
+                45deg,
+                #cbd5e1,
+                #cbd5e1 5px,
+                #f1f5f9 5px,
+                #f1f5f9 10px
+            );
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding-left: 2cqw;
+            font-size: 2.5cqw;
+            font-weight: 700;
+            color: #94a3b8;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            white-space: nowrap;
+            letter-spacing: 0.15cqw;
+            text-transform: uppercase;
+        }
+
+        .card-back-cvv {
+            background: white;
+            color: black;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 4cqw;
+            font-weight: 700;
+            padding: 1.5cqw 3cqw;
+            border-radius: 4px;
+            text-align: center;
+            min-width: 13cqw;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card-back-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 7cqw;
+            margin-top: auto;
+        }
+
+        .card-back-label {
+            font-size: 4.2cqw;
+            font-weight: 800;
+            letter-spacing: 0.4cqw;
+            color: rgba(255,255,255,0.7);
+            font-style: italic;
+            text-transform: uppercase;
+        }        /* Glare effect overlay - DISABLED */
+        .card-glare {
+            display: none !important;
+        }
+
+        /* Holographic diagonal shine sweep - DISABLED */
+        .credit-card::after {
+            display: none !important;
+        }
+
+        /* Responsive Overrides for Inner Elements */
+        .card-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .card-bank-info {
+            display: flex;
+            align-items: center;
+            gap: 1.5cqw;
+        }
+
+        .card-bank-logo {
+            width: 3.5cqw;
+            height: 3.5cqw;
+            background: white;
+            border-radius: 50% 50% 0 50%;
+            display: inline-block;
+        }
+
+        .card-bank-name {
+            font-size: 3cqw;
+            font-weight: 700;
+            letter-spacing: 0.2cqw;
+            text-transform: uppercase;
+            color: white;
+        }
+
+        .card-type-label {
+            font-size: 3cqw;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 500;
+            letter-spacing: 0.05cqw;
+        }
+
+        .card-mid-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-top: 3%;
+        }
+
+        .card-chip {
+            width: 13.5cqw !important;
+            height: 10.8cqw !important;
+            background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%) !important;
+            border-radius: 4px;
+            position: relative;
+            box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
+        }
+
+        .card-chip::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 25%; right: 25%; bottom: 0;
+            border-left: 1px solid rgba(0,0,0,0.15);
+            border-right: 1px solid rgba(0,0,0,0.15);
+        }
+
+        .card-chip::after {
+            content: '';
+            position: absolute;
+            top: 30%; left: 0; right: 0; bottom: 30%;
+            border-top: 1px solid rgba(0,0,0,0.15);
+            border-bottom: 1px solid rgba(0,0,0,0.15);
+        }
+
+        .card-contactless {
+            color: white;
+            opacity: 0.85;
+            display: flex;
+            align-items: center;
+        }
+
+        .card-number-display {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 6.5cqw !important;
+            letter-spacing: 0.8cqw !important;
+            margin: 4% 0 1% 0 !important;
+            word-spacing: 1.5cqw !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: clip !important;
+            width: 100%;
+            text-align: left;
+        }
+
+        .card-details-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 2%;
+        }
+
+        .card-four-digit {
+            font-size: 2.2cqw;
+            font-family: 'Share Tech Mono', monospace;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 0.1cqw;
+        }
+
+        .card-expiry-box {
+            display: flex;
+            align-items: center;
+            gap: 1.5cqw;
+        }
+
+        .card-expiry-label {
+            font-size: 1.6cqw;
+            color: rgba(255, 255, 255, 0.55);
+            line-height: 1.1;
+            text-transform: uppercase;
+            text-align: right;
+        }
+
+        .card-expiry-val {
+            font-size: 3.5cqw;
+            font-weight: 600;
+            color: white;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .card-footer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+            margin-top: auto;
+        }
+
+        .card-holder-name {
+            font-size: 3.5cqw;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.15cqw;
+            color: white;
+        }
+
+        .card-brand-badge {
+            font-size: 4.5cqw;
+            font-weight: 800;
+            font-style: italic;
+            letter-spacing: 0.1cqw;
+            text-transform: uppercase;
+            color: white;
+        }
+
+        .card-cvv-val {
+            font-size: 3.5cqw !important;
+        }
+
+        /* Update Theme application to SOLID flat colors (no gradients) */
+        .theme-visa .card-front {
+            background-color: #1e3a8a !important;
+            background: #1e3a8a !important;
+        }
+        .theme-visa .card-back {
+            background-color: #0f172a !important;
+            background: #0f172a !important;
+        }
+
+        .theme-mastercard .card-front {
+            background-color: #7f1d1d !important;
+            background: #7f1d1d !important;
+        }
+        .theme-mastercard .card-back {
+            background-color: #450a0a !important;
+            background: #450a0a !important;
+        }
+
+        .theme-amex .card-front {
+            background-color: #064e3b !important;
+            background: #064e3b !important;
+        }
+        .theme-amex .card-back {
+            background-color: #022c22 !important;
+            background: #022c22 !important;
+        }
+
+        .theme-discover .card-front {
+            background-color: #7c2d12 !important;
+            background: #7c2d12 !important;
+        }
+        .theme-discover .card-back {
+            background-color: #431407 !important;
+            background: #431407 !important;
+        }
+
+        .theme-jcb .card-front {
+            background-color: #311042 !important;
+            background: #311042 !important;
+        }
+        .theme-jcb .card-back {
+            background-color: #1e1b4b !important;
+            background: #1e1b4b !important;
+        }
+
+        .theme-diners .card-front {
+            background-color: #374151 !important;
+            background: #374151 !important;
+        }
+        .theme-diners .card-back {
+            background-color: #1f2937 !important;
+            background: #1f2937 !important;
+        }
+
+        .theme-rupay .card-front {
+            background-color: #0c4a6e !important;
+            background: #0c4a6e !important;
+        }
+        .theme-rupay .card-back {
+            background-color: #032840 !important;
+            background: #032840 !important;
+        }
+
+        /* Vault Grid & Vault Items */
+        .vault-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.2rem;
+            margin-top: 0.5rem;
+        }
+
+        .vault-item {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .vault-item:hover {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.1);
+        }
+
+        .vault-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+        }
+
+        .vault-item-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* Micro badges matching card themes */
+        .badge-visa { background: #1d4ed8; }
+        .badge-mastercard { background: #991b1b; }
+        .badge-amex { background: #115e59; }
+        .badge-discover { background: #9a3412; }
+        .badge-jcb { background: #4c1d95; }
+        .badge-diners { background: #4b5563; }
+        .badge-rupay { background: #075985; }
+
+        .vault-item-number {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            margin-bottom: 0.4rem;
+            color: var(--text-main);
+        }
+
+        .vault-item-name {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .vault-item-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 0.8rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 0.8rem;
+        }
+
+        .vault-btn {
+            flex: 1;
+            padding: 6px;
+            font-size: 0.7rem;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .vault-btn-load {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--primary);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        .vault-btn-load:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .vault-btn-delete {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .vault-btn-delete:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Empty vault state */
+        .vault-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem 0;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Header -->
+    <div class="app-header">
+        <h1>SecurScan AI™</h1>
+        <p>Advanced Anti-Counterfeit Network Node & Test Suite</p>
+    </div>
+
+    <div class="dashboard-container">
+
+        <!-- Top Showcase: Virtual Card Display (with 3D structure) -->
+        <div class="card-showcase" style="flex-direction: column; gap: 1rem;">
+            <div class="card-container" onclick="flipCard()">
+                <div class="credit-card" id="visualCard">
+                    <!-- Front Face -->
+                    <div class="card-face card-front">
+                        <div class="card-glare" id="glareFront"></div>
+                        
+                        <!-- Top Row: Bank Info and Credit Card type -->
+                        <div class="card-header-row">
+                            <div class="card-bank-info">
+                                <span class="card-bank-logo"></span>
+                                <span class="card-bank-name">BANK NAME</span>
+                            </div>
+                            <div class="card-type-label">Credit Card</div>
+                        </div>
+                        
+                        <!-- Middle Row: Chip & Contactless -->
+                        <div class="card-mid-row">
+                            <div class="card-chip"></div>
+                            <div class="card-contactless">
+                                <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="opacity: 0.85;">
+                                    <path d="M11.534 7.62a.5.5 0 0 1 0 .76c-2.04 1.84-2.04 4.82 0 6.66a.5.5 0 0 1-.67.74c-2.43-2.19-2.43-5.95 0-8.14a.5.5 0 0 1 .67.74zm-2.58.74c-1.4 1.26-1.4 3.32 0 4.58a.5.5 0 0 1-.67.74c-1.8-1.62-1.8-4.26 0-5.88a.5.5 0 0 1 .67.74zm-2.58.74c-.76.68-.76 1.8 0 2.48a.5.5 0 0 1-.67.74c-1.16-1.04-1.16-2.74 0-3.78a.5.5 0 0 1 .67.74z"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Card Number (Strictly on one line) -->
+                        <div class="card-number-display" id="visualCardNumber">•••• •••• •••• ••••</div>
+                        
+                        <!-- Details Row: 4-digit code and Expiry -->
+                        <div class="card-details-row">
+                            <div class="card-four-digit">6324</div>
+                            <div class="card-expiry-box">
+                                <span class="card-expiry-label">EXPIRES<br>END</span>
+                                <span class="card-expiry-val" id="visualCardExpiry">00/00</span>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Row: Cardholder Name & Brand Badge -->
+                        <div class="card-footer-row">
+                            <div class="card-holder-name" id="visualCardName">CARDHOLDER NAME</div>
+                            <div class="card-brand-badge" id="visualCardLogo">CARD</div>
+                        </div>
+                    </div>
+                    <!-- Back Face -->
+                    <div class="card-face card-back">
+                        <div class="card-glare" id="glareBack"></div>
+                        <div class="card-back-strip"></div>
+                        <div class="card-back-signature-container">
+                            <div class="card-back-signature">
+                                <span>VALID CARDHOLDER VALID CARDHOLDER</span>
+                            </div>
+                            <div class="card-back-cvv" id="visualCardCVV">•••</div>
+                        </div>
+                        <div class="card-back-info">
+                            <div class="card-back-label" id="visualCardBackLogo">CARD</div>
+                            <div style="font-size: 0.5rem; color: rgba(255,255,255,0.4); text-align: right; line-height: 1.2;">
+                                AUTHORIZED SIGNATURE • NOT VALID UNLESS SIGNED<br>
+                                SECURSCAN AI SYSTEMS • SECURITY CODE VERIFIED
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; width: 100%; max-width: 320px; justify-content: center; margin-top: 5px;">
+                <button class="btn-muted" id="btnFlipCard" style="flex: 1; padding: 8px 16px; font-size: 0.75rem; border-radius: 20px;" onclick="flipCard()">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:2px"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                    Flip Card
+                </button>
+                <button class="btn-cyan" id="btnSaveToVault" style="flex: 1; padding: 8px 16px; font-size: 0.75rem; background: linear-gradient(135deg, var(--primary) 0%, #10b981 100%); border-radius: 20px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);" onclick="saveCurrentCard()">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right:2px"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v4.793L5.354 4.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 6.793V2a2 2 0 0 0-2-2H2z"/></svg>
+                    Save Vault
+                </button>
+            </div>
+        </div>
+
+        <!-- Left Column: Camera Node Scanner -->
+        <div class="glass-panel" id="scannerPanel">
+            <div class="panel-title">
+                <span></span> Physical Card Node Scanner
+            </div>
+
+            <div class="video-wrapper" id="videoWrapper">
+                <video id="webcam" autoplay playsinline muted></video>
+                <div class="scan-laser-frame" id="laserFrame"></div>
+            </div>
+
+            <div class="control-group">
+                <button class="btn-muted" id="btnCameraBoot" onclick="bootCamera()">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:2px"><path d="M10.5 8.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/><path d="M2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2zm.5 2a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1zm9 2.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z"/></svg>
+                    Boot Camera
+                </button>
+                <button class="btn-cyan" id="btnScan" onclick="captureAndAnalyze()" disabled>
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:2px"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zM2.5 2a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/></svg>
+                    Scan Card
+                </button>
+            </div>
+
+            <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+            <button class="btn-muted" id="btnUploadFallback" style="width: 100%; margin-bottom: 1.2rem; display: none;" onclick="document.getElementById('fileInput').click()">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:4px"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+                Upload Card Image File
+            </button>
+
+            <div class="progress-bar-container" id="ocrProgressBar">
+                <div class="progress-bar-fill" id="ocrProgressBarFill"></div>
+            </div>
+
+            <!-- Preprocessed View Frame -->
+            <div class="ocr-preview-section">
+                <canvas class="ocr-preview-canvas" id="canvasCrop"></canvas>
+                <div class="ocr-preview-desc">
+                    <strong>Preprocessed Isolation Matrix</strong>
+                    Visual of coordinates passing into the browser WASM OCR model.
+                </div>
+            </div>
+
+            <!-- Diagnostics log console -->
+            <div class="console-logs" id="terminalLogs">
+                <div class="console-entry">
+                    <span class="console-time">[00:00:00]</span>
+                    <span>System initialized. Node awaiting sensor configuration...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Card Generator & Manual Debug -->
+        <div class="glass-panel">
+            <div class="panel-title">
+                <span></span> Digital Debug & Card Generator
+            </div>
+
+            <!-- Generator Section -->
+            <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem;">
+                <label style="display:block; font-size:0.85rem; font-weight:600; letter-spacing:1px; margin-bottom:8px; text-transform:uppercase;">Select Routing Profile</label>
+                <select class="custom-input" id="generateNetwork">
+                    <option value="Visa">Visa</option>
+                    <option value="Mastercard">Mastercard</option>
+                    <option value="American Express">American Express</option>
+                    <option value="Discover">Discover</option>
+                    <option value="JCB">JCB</option>
+                    <option value="Diners Club">Diners Club</option>
+                    <option value="RuPay">RuPay</option>
+                </select>
+
+                <button class="btn-cyan" style="width:100%; background: linear-gradient(135deg, var(--accent) 0%, #f472b6 100%); box-shadow: 0 4px 14px rgba(217, 70, 239, 0.3);" onclick="generateCard()">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right:2px"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M11.5 4v8h-1V8h-5v4h-1V4h1v3h5V4h1z"/></svg>
+                    Generate Credentials
+                </button>
+            </div>
+
+            <!-- Manual Validation Section -->
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:600; letter-spacing:1px; margin-bottom:8px; text-transform:uppercase;">Sequence Core Check</label>
+                <input type="text" id="manualInput" class="custom-input" placeholder="Enter card sequence manually..." oninput="onManualInput()">
+                
+                <button class="btn-muted" style="width:100%;" onclick="validateManualSequence()">
+                    Verify Digit Math
+                </button>
+            </div>
+
+            <div class="console-logs" id="generatorLogs">
+                <div class="console-entry">
+                    <span class="console-time">[00:00:00]</span>
+                    <span>Test Suite Online. Select a network to generate valid data.</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Copied to clipboard Toast Notification -->
+    <div class="toast" id="copyToast">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="color:var(--success)"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z"/></svg>
+        <span>Card number copied to clipboard!</span>
+    </div>
+
+    <script>
+        let videoStream = null;
+        let isScanning = false;
+
+        // Visual Card element variables
+        const vCard = document.getElementById('visualCard');
+        const vCardNumber = document.getElementById('visualCardNumber');
+        const vCardLogo = document.getElementById('visualCardLogo');
+        const vCardName = document.getElementById('visualCardName');
+        const vCardExpiry = document.getElementById('visualCardExpiry');
+        const vCardCVV = document.getElementById('visualCardCVV');
+
+        // Helper: Format system time
+        function getTimestamp() {
+            const now = new Date();
+            return `[${now.toTimeString().split(' ')[0]}]`;
+        }
+
+        // Helper: Log console entries
+        function appendLog(elementId, text, statusClass = '') {
+            const panel = document.getElementById(elementId);
+            const entry = document.createElement('div');
+            entry.className = 'console-entry';
+            
+            const time = document.createElement('span');
+            time.className = 'console-time';
+            time.innerText = getTimestamp();
+            
+            const content = document.createElement('span');
+            if (statusClass) content.className = statusClass;
+            content.innerText = text;
+
+            entry.appendChild(time);
+            entry.appendChild(content);
+            panel.appendChild(entry);
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // Camera Management
+        async function bootCamera() {
+            const video = document.getElementById('webcam');
+            const btnScan = document.getElementById('btnScan');
+            const btnUpload = document.getElementById('btnUploadFallback');
+            appendLog('terminalLogs', 'Initializing optical capture module...');
+            
+            try {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("getUserMedia not supported in this browser context (insecure origin or old browser)");
+                }
+                videoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                video.srcObject = videoStream;
+                btnScan.disabled = false;
+                if (btnUpload) btnUpload.style.display = 'none';
+                appendLog('terminalLogs', 'OPTICAL FEED SUCCESS: Real-time alignment frame active.', 'console-status-valid');
+            } catch (err) {
+                appendLog('terminalLogs', 'OPTICAL FEED INACTIVE: Camera blocked or context insecure.', 'console-status-fake');
+                appendLog('terminalLogs', 'FALLBACK ACTIVATED: Use local image upload button below.', 'console-status-active');
+                if (btnUpload) btnUpload.style.display = 'flex';
+            }
+        }
+
+        // Card Styling Dynamic Swappers
+        function updateCardVisuals(number, name, expiry, cvv, network) {
+            // Remove previous network classes
+            vCard.className = 'credit-card';
+            
+            // Format number
+            let formattedNum = "•••• •••• •••• ••••";
+            if (number) {
+                const clean = number.replace(/\s+/g, '');
+                if (network === 'American Express') {
+                    // Amex format: 4-6-5 digits
+                    const match = clean.match(/^(\d{4})(\d{0,6})(\d{0,5})$/);
+                    if (match) {
+                        formattedNum = `${match[1]} ${match[2]} ${match[3]}`.trim();
+                    } else {
+                        formattedNum = clean;
+                    }
+                } else if (clean.length > 0) {
+                    // Standard format: groups of 4
+                    formattedNum = clean.match(/.{1,4}/g).join(' ');
+                }
+            }
+
+            vCardNumber.innerText = formattedNum;
+            if (name !== undefined) {
+                vCardName.innerText = name || "VALID CARDHOLDER";
+                // Also update the signature lines on the back
+                const sigText = document.querySelector('.card-back-signature span');
+                if (sigText) sigText.innerText = (name || "VALID CARDHOLDER") + " " + (name || "VALID CARDHOLDER");
+            }
+            if (expiry !== undefined) vCardExpiry.innerText = expiry || "MM/YY";
+            if (cvv !== undefined) vCardCVV.innerText = cvv || "•••";
+
+            // Swap card visual profile matching card network rules
+            const backLogo = document.getElementById('visualCardBackLogo');
+            if (network) {
+                vCardLogo.innerText = network;
+                if (backLogo) backLogo.innerText = network;
+                const classMap = {
+                    'Visa': 'theme-visa',
+                    'Mastercard': 'theme-mastercard',
+                    'American Express': 'theme-amex',
+                    'Discover': 'theme-discover',
+                    'JCB': 'theme-jcb',
+                    'Diners Club': 'theme-diners',
+                    'RuPay': 'theme-rupay'
+                };
+                if (classMap[network]) {
+                    vCard.classList.add(classMap[network]);
+                }
+            } else {
+                vCardLogo.innerText = "CARD";
+                if (backLogo) backLogo.innerText = "CARD";
+            }
+        }
+
+        // Manual Input Listener
+        function onManualInput() {
+            const val = document.getElementById('manualInput').value;
+            const digits = val.replace(/\D/g, '');
+            
+            // Basic prefix routing representation
+            let detectedNetwork = null;
+            if (digits.startsWith('4')) detectedNetwork = "Visa";
+            else if (digits.startsWith(('34')) || digits.startsWith('37')) detectedNetwork = "American Express";
+            else if (digits.startsWith('5') || (digits.length >= 4 && parseInt(digits.slice(0,4)) >= 2221 && parseInt(digits.slice(0,4)) <= 2720)) detectedNetwork = "Mastercard";
+            else if (digits.startsWith('6011') || digits.startsWith('65')) detectedNetwork = "Discover";
+            else if (digits.length >= 4 && parseInt(digits.slice(0,4)) >= 3528 && parseInt(digits.slice(0,4)) <= 3589) detectedNetwork = "JCB";
+            else if (digits.startsWith('36') || digits.startsWith('38')) detectedNetwork = "Diners Club";
+            else if (digits.startsWith('60') || digits.startsWith('81') || digits.startsWith('82')) detectedNetwork = "RuPay";
+
+            updateCardVisuals(digits, "DEBUG CORE USER", "12/29", "000", detectedNetwork);
+        }
+
+        // Manual Sequence Verification API Call
+        async function validateManualSequence(preserveFields = false) {
+            const val = document.getElementById('manualInput').value;
+            const clean = val.replace(/\D/g, '');
+
+            if (!clean) {
+                appendLog('generatorLogs', 'WARNING: Manual sequence input is empty.', 'console-status-fake');
+                return;
+            }
+
+            appendLog('generatorLogs', `Initiating manual verification flow for ${clean.slice(0, 6)}...`);
+
+            try {
+                const res = await fetch('/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_number: clean })
+                });
+                const data = await res.json();
+                
+                if (data.status === 'valid') {
+                    appendLog('generatorLogs', `SUCCESS: ${data.message}`, 'console-status-valid');
+                    if (preserveFields) {
+                        updateCardVisuals(clean, undefined, undefined, undefined, data.network);
+                    } else {
+                        updateCardVisuals(clean, "DEBUG CORE USER", "12/29", "000", data.network);
+                    }
+                } else {
+                    appendLog('generatorLogs', `FAILED: ${data.message}`, 'console-status-fake');
+                }
+            } catch (err) {
+                appendLog('generatorLogs', 'API Connection Error.', 'console-status-fake');
+            }
+        }
+
+        // Generated Test Credentials API Call
+        async function generateCard() {
+            const network = document.getElementById('generateNetwork').value;
+            appendLog('generatorLogs', `Requesting test credentials for profile: ${network}...`);
+
+            try {
+                const res = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: network })
+                });
+                const data = await res.json();
+                
+                // Populate UI components
+                document.getElementById('manualInput').value = data.card_number;
+                updateCardVisuals(data.card_number, data.cardholder_name, data.expiry, data.cvv, data.network);
+                
+                appendLog('generatorLogs', `GENERATED: ${data.network} // No: ${data.card_number} // Exp: ${data.expiry} // CVV: ${data.cvv}`, 'console-status-valid');
+                
+                // Copy card number to clipboard
+                navigator.clipboard.writeText(data.card_number).then(() => {
+                    const toast = document.getElementById('copyToast');
+                    toast.classList.add('show');
+                    setTimeout(() => toast.classList.remove('show'), 2000);
+                });
+
+                // Auto Trigger Validation to show that it is indeed structurally sound, preserving details
+                validateManualSequence(true);
+            } catch (err) {
+                appendLog('generatorLogs', 'Failed to generate credentials via backend API.', 'console-status-fake');
+            }
+        }
+
+        // Image Processing & OCR Scanner Flow
+        async function captureAndAnalyze() {
+            if (isScanning) return;
+            
+            const video = document.getElementById('webcam');
+            const wrapper = document.getElementById('videoWrapper');
+            const laser = document.getElementById('laserFrame');
+            const canvasCrop = document.getElementById('canvasCrop');
+            const progressContainer = document.getElementById('ocrProgressBar');
+            const progressFill = document.getElementById('ocrProgressBarFill');
+
+            isScanning = true;
+            wrapper.classList.add('scanning');
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            
+            appendLog('terminalLogs', 'Running camera grab & optical character extraction routines...', 'console-status-active');
+
+            // 1. Coordinates Mapping (Display size mapping to Video natural size)
+            const videoRect = video.getBoundingClientRect();
+            const laserRect = laser.getBoundingClientRect();
+            
+            const scaleX = video.videoWidth / video.clientWidth;
+            const scaleY = video.videoHeight / video.clientHeight;
+
+            const cropX = (laserRect.left - videoRect.left) * scaleX;
+            const cropY = (laserRect.top - videoRect.top) * scaleY;
+            const cropW = laserRect.width * scaleX;
+            const cropH = laserRect.height * scaleY;
+
+            // 2. Set Canvas size and render cropped area
+            const ctx = canvasCrop.getContext('2d');
+            canvasCrop.width = cropW;
+            canvasCrop.height = cropH;
+            
+            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+            appendLog('terminalLogs', 'ISOLATION COMPLETE: Enhancing signal contrast matrix...');
+
+            // 3. Image Preprocessing (Grayscale + Adaptive Binarization Filter)
+            const imgData = ctx.getImageData(0, 0, cropW, cropH);
+            const pixels = imgData.data;
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i+1];
+                const b = pixels[i+2];
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                gray = (gray > 125) ? 255 : 0;
+                pixels[i] = gray;
+                pixels[i+1] = gray;
+                pixels[i+2] = gray;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            appendLog('terminalLogs', 'OCR ENGINE LOADED: Running character inference...');
+
+            // 4. Run Tesseract OCR in Browser
+            try {
+                const worker = await Tesseract.createWorker('eng', 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const pct = Math.round(m.progress * 100);
+                            progressFill.style.width = `${pct}%`;
+                        }
+                    }
+                });
+
+                const { data: { text } } = await worker.recognize(canvasCrop);
+                await worker.terminate();
+
+                appendLog('terminalLogs', `RAW DETECTED TEXT: "${text.trim().replace(/\n/g, ' ')}"`);
+                await processExtractedText(text);
+
+            } catch (ocrErr) {
+                console.error(ocrErr);
+                appendLog('terminalLogs', 'CRITICAL ERROR: Browser OCR processing engine faulted.', 'console-status-fake');
+            } finally {
+                isScanning = false;
+                wrapper.classList.remove('scanning');
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        // Upload and File fallback mechanics
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    analyzeStaticImage(img);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function analyzeStaticImage(img) {
+            const canvasCrop = document.getElementById('canvasCrop');
+            const progressContainer = document.getElementById('ocrProgressBar');
+            const progressFill = document.getElementById('ocrProgressBarFill');
+
+            isScanning = true;
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            
+            appendLog('terminalLogs', 'Analyzing uploaded image stream...', 'console-status-active');
+
+            const ctx = canvasCrop.getContext('2d');
+            canvasCrop.width = img.width;
+            canvasCrop.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            appendLog('terminalLogs', 'Preprocessing upload texture...');
+            const imgData = ctx.getImageData(0, 0, img.width, img.height);
+            const pixels = imgData.data;
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i+1];
+                const b = pixels[i+2];
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                gray = (gray > 125) ? 255 : 0;
+                pixels[i] = gray;
+                pixels[i+1] = gray;
+                pixels[i+2] = gray;
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            appendLog('terminalLogs', 'Running character inference on upload matrix...');
+
+            try {
+                const worker = await Tesseract.createWorker('eng', 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const pct = Math.round(m.progress * 100);
+                            progressFill.style.width = `${pct}%`;
+                        }
+                    }
+                });
+
+                const { data: { text } } = await worker.recognize(canvasCrop);
+                await worker.terminate();
+
+                appendLog('terminalLogs', `RAW DETECTED TEXT: "${text.trim().replace(/\n/g, ' ')}"`);
+                await processExtractedText(text);
+
+            } catch (err) {
+                console.error(err);
+                appendLog('terminalLogs', 'CRITICAL ERROR: Upload OCR parsing failed.', 'console-status-fake');
+            } finally {
+                isScanning = false;
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        async function processExtractedText(text) {
+            let foundNumber = null;
+            const cleanSeparators = text.replace(/[^0-9\s-]/g, ' ');
+            
+            const pattern16 = /\b\d{4}[-\s]+\d{4}[-\s]+\d{4}[-\s]+\d{4}\b/;
+            const pattern15 = /\b\d{4}[-\s]+\d{6}[-\s]+\d{5}\b/;
+            const pattern14 = /\b\d{4}[-\s]+\d{6}[-\s]+\d{4}\b/;
+            
+            const match16 = cleanSeparators.match(pattern16);
+            const match15 = cleanSeparators.match(pattern15);
+            const match14 = cleanSeparators.match(pattern14);
+            
+            if (match16) {
+                foundNumber = match16[0].replace(/[-\s]/g, '');
+            } else if (match15) {
+                foundNumber = match15[0].replace(/[-\s]/g, '');
+            } else if (match14) {
+                foundNumber = match14[0].replace(/[-\s]/g, '');
+            }
+            
+            if (!foundNumber) {
+                const contiguousMatch = text.match(/\b\d{13,19}\b/);
+                if (contiguousMatch) {
+                    foundNumber = contiguousMatch[0];
+                }
+            }
+            
+            if (!foundNumber) {
+                const lines = text.split('\n');
+                for (let line of lines) {
+                    const cleanedLine = line.replace(/[^0-9]/g, '');
+                    if (cleanedLine.length >= 13 && cleanedLine.length <= 19) {
+                        foundNumber = cleanedLine;
+                        break;
+                    }
+                }
+            }
+            
+            if (!foundNumber) {
+                const allDigits = text.replace(/[^0-9]/g, '');
+                if (allDigits.length >= 13 && allDigits.length <= 19) {
+                    foundNumber = allDigits;
+                } else if (allDigits.length > 19) {
+                    if (allDigits.startsWith('34') || allDigits.startsWith('37')) {
+                        foundNumber = allDigits.slice(0, 15);
+                    } else if (allDigits.startsWith('30') || allDigits.startsWith('36') || allDigits.startsWith('38')) {
+                        foundNumber = allDigits.slice(0, 14);
+                    } else {
+                        foundNumber = allDigits.slice(0, 16);
+                    }
+                }
+            }
+
+            if (foundNumber) {
+                appendLog('terminalLogs', `Extracted potential sequence: ${foundNumber}`);
+                
+                const res = await fetch('/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_number: foundNumber })
+                });
+                const checkResult = await res.json();
+                
+                if (checkResult.status === 'valid') {
+                    appendLog('terminalLogs', checkResult.message, 'console-status-valid');
+                    updateCardVisuals(foundNumber, "PHYSICAL SCANNED CARD", "09/30", "•••", checkResult.network);
+                    document.getElementById('manualInput').value = foundNumber;
+                } else {
+                    appendLog('terminalLogs', `OCR VALIDATION FAILURE: ${checkResult.message}`, 'console-status-fake');
+                    updateCardVisuals(foundNumber, "FAILED STRUCTURAL", "XX/XX", "•••", null);
+                }
+            } else {
+                appendLog('terminalLogs', 'OCR ERROR: No structured card number sequences recognized. Re-align and try again.', 'console-status-fake');
+            }
+        }
+
+        // 3D Flip Mechanics
+        let isFlipped = false;
+        function flipCard(force = null) {
+            const cardElement = document.getElementById('visualCard');
+            if (force !== null) {
+                isFlipped = force;
+            } else {
+                isFlipped = !isFlipped;
+            }
+            if (isFlipped) {
+                cardElement.classList.add('flipped');
+            } else {
+                cardElement.classList.remove('flipped');
+            }
+        }
+
+        // Mouse Parallax and Holographic tilt shader
+        const container = document.querySelector('.card-container');
+        const visualCard = document.getElementById('visualCard');
+        const glareFront = document.getElementById('glareFront');
+        const glareBack = document.getElementById('glareBack');
+
+        container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const xc = rect.width / 2;
+            const yc = rect.height / 2;
+            
+            const rotateX = (yc - y) / 8;
+            const rotateY = (x - xc) / 10;
+            
+            const glareX = (x / rect.width) * 100;
+            const glareY = (y / rect.height) * 100;
+            
+            if (isFlipped) {
+                visualCard.style.transform = `rotateY(180deg) rotateX(${-rotateX}deg) rotateY(${-rotateY}deg)`;
+            } else {
+                visualCard.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            }
+            
+            glareFront.style.setProperty('--x', `${glareX}%`);
+            glareFront.style.setProperty('--y', `${glareY}%`);
+            glareBack.style.setProperty('--x', `${100 - glareX}%`);
+            glareBack.style.setProperty('--y', `${glareY}%`);
+        });
+
+        container.addEventListener('mouseleave', () => {
+            if (isFlipped) {
+                visualCard.style.transform = `rotateY(180deg)`;
+            } else {
+                visualCard.style.transform = `rotateX(0deg) rotateY(0deg)`;
+            }
+            glareFront.style.setProperty('--x', `50%`);
+            glareFront.style.setProperty('--y', `50%`);
+            glareBack.style.setProperty('--x', `50%`);
+            glareBack.style.setProperty('--y', `50%`);
+        });
+
+        // Local Storage Card Vault API and Handlers
+        let cardVault = [];
+
+        function initVault() {
+            const stored = localStorage.getItem('securscan_vault');
+            if (stored) {
+                try {
+                    cardVault = JSON.parse(stored);
+                } catch (err) {
+                    cardVault = [];
+                }
+            } else {
+                cardVault = [];
+            }
+            renderVault();
+        }
+
+        function saveCurrentCard() {
+            const number = vCardNumber.innerText.replace(/\s/g, '');
+            if (number.includes('•') || !number) {
+                alert("Cannot save empty visual states. Generate or type a valid sequence first.");
+                return;
+            }
+            
+            const name = vCardName.innerText;
+            const expiry = vCardExpiry.innerText;
+            const cvv = vCardCVV.innerText;
+            const logo = vCardLogo.innerText;
+            const network = (logo === 'CARD') ? 'Unknown' : logo;
+            
+            // Check duplicate
+            if (cardVault.some(c => c.number === number)) {
+                alert("Card sequence already logged in the security vault.");
+                return;
+            }
+            
+            const newCard = {
+                id: Date.now().toString(),
+                number: number,
+                name: name,
+                expiry: expiry,
+                cvv: cvv,
+                network: network
+            };
+            
+            cardVault.push(newCard);
+            localStorage.setItem('securscan_vault', JSON.stringify(cardVault));
+            renderVault();
+            
+            appendLog('generatorLogs', `SAVED TO VAULT: ${network} // Masked: ************${number.slice(-4)}`, 'console-status-valid');
+        }
+
+        function deleteVaultCard(id) {
+            cardVault = cardVault.filter(c => c.id !== id);
+            localStorage.setItem('securscan_vault', JSON.stringify(cardVault));
+            renderVault();
+        }
+
+        function loadVaultCard(id) {
+            const card = cardVault.find(c => c.id === id);
+            if (!card) return;
+            
+            document.getElementById('manualInput').value = card.number;
+            updateCardVisuals(card.number, card.name, card.expiry, card.cvv, card.network);
+            
+            // Ensure card is flipped to front face when loaded
+            flipCard(false);
+            
+            appendLog('generatorLogs', `VAULT LOADED: ${card.network} // Profile loaded into debug environment.`, 'console-status-active');
+            
+            // Validate sequence to trigger verify indicator
+            validateManualSequence(true);
+        }
+
+        function renderVault() {
+            const grid = document.getElementById('vaultGrid');
+            grid.innerHTML = '';
+            
+            if (cardVault.length === 0) {
+                grid.innerHTML = '<div class="vault-empty">VAULT EMPTY // No credentials stored in local storage buffer.</div>';
+                return;
+            }
+            
+            cardVault.forEach(card => {
+                const item = document.createElement('div');
+                item.className = 'vault-item';
+                
+                const masked = card.number.length >= 14 ? 
+                    `•••• •••• •••• ${card.number.slice(-4)}` : 
+                    `•••• •••••• ${card.number.slice(-4)}`;
+                
+                const badgeClass = `badge-${card.network.toLowerCase().replace(/\s/g, '')}`;
+                
+                item.innerHTML = `
+                    <div>
+                        <div class="vault-item-header">
+                            <span class="vault-item-badge ${badgeClass}">${card.network}</span>
+                            <span style="font-size:0.6rem; color:rgba(255,255,255,0.3); font-family:monospace;">ID: ${card.id.slice(-4)}</span>
+                        </div>
+                        <div class="vault-item-number">${masked}</div>
+                        <div class="vault-item-name">${card.name}</div>
+                        <div style="font-size:0.7rem; color:rgba(255,255,255,0.5); margin-top:4px; font-family:monospace;">
+                            EXP: ${card.expiry} | CVV: ${card.cvv}
+                        </div>
+                    </div>
+                    <div class="vault-item-actions">
+                        <button class="vault-btn vault-btn-load" onclick="loadVaultCard('${card.id}')">Load</button>
+                        <button class="vault-btn vault-btn-delete" onclick="deleteVaultCard('${card.id}')">Delete</button>
+                    </div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        // Initialize vault on window load
+        window.onload = function() {
+            initVault();
+        };
+    </script>
+
+    <!-- Persistent Vault HTML Panel -->
+    <div style="width:100%; max-width:1100px; margin-top:2rem;">
+        <div class="glass-panel" style="min-height: auto;">
+            <div class="panel-title">
+                <span></span> Decrypted Card Vault
+            </div>
+            <div class="vault-grid" id="vaultGrid">
+                <!-- Vault items populated dynamically -->
+            </div>
+        </div>
+    </div>
+</body>
+</html>
