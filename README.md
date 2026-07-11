@@ -71,12 +71,13 @@ Open your browser and navigate to:
 **`http://localhost:5000`**
 
 ---
+
+## ⚠️ Disclaimer
+This tool is built strictly for **educational, testing, and system diagnostic purposes**. All generated credit details are synthetic mock numbers that pass Luhn arithmetic checks but contain no financial value.
+
 👤 Author
 Tejas Dhakate
 Role: Computer Engineering Student
 University: Rashtrasant Tukadoji Maharaj Nagpur University (RTMNU)
 GitHub: @tejasdhakate62-dev
 Email: tejasdhakate62@gmail.com
-
-## ⚠️ Disclaimer
-This tool is built strictly for **educational, testing, and system diagnostic purposes**. All generated credit details are synthetic mock numbers that pass Luhn arithmetic checks but contain no financial value.
